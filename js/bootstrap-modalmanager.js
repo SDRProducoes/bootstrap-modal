@@ -15,398 +15,390 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * ========================================================== */
+ define(['jquery', 'bootstrap'], function ($) {
 
 !function ($) {
 
-	"use strict"; // jshint ;_;
+    "use strict"; // jshint ;_;
 
-	/* MODAL MANAGER CLASS DEFINITION
-	* ====================== */
+    /* MODAL MANAGER CLASS DEFINITION
+    * ====================== */
 
-	var ModalManager = function (element, options) {
-		this.init(element, options);
-	};
+    var ModalManager = function (element, options) {
+        this.init(element, options);
+    };
 
-	ModalManager.prototype = {
+    ModalManager.prototype = {
 
-		constructor: ModalManager,
+        constructor: ModalManager,
 
-		init: function (element, options) {
-			this.$element = $(element);
-			this.options = $.extend({}, $.fn.modalmanager.defaults, this.$element.data(), typeof options == 'object' && options);
-			this.stack = [];
-			this.backdropCount = 0;
+        init: function (element, options) {
+            this.$element = $(element);
+            this.options = $.extend({}, $.fn.modalmanager.defaults, this.$element.data(), typeof options == 'object' && options);
+            this.stack = [];
+            this.backdropCount = 0;
 
-			if (this.options.resize) {
-				var resizeTimeout,
-					that = this;
+            if (this.options.resize) {
+                var resizeTimeout,
+                    that = this;
 
-				$(window).on('resize.modal', function(){
-					resizeTimeout && clearTimeout(resizeTimeout);
-					resizeTimeout = setTimeout(function(){
-						for (var i = 0; i < that.stack.length; i++){
-							that.stack[i].isShown && that.stack[i].layout();
-						}
-					}, 10);
-				});
-			}
-		},
+                $(window).on('resize.modal', function() {
+                    if ($('.modal-scrollable .close').length) {
+                        $('.modal-scrollable .close').css('top', $('.modal-body').offset().top * -1);
+                        $('.modal-comments-scroll').height($('.modal-comments').height() - 60);
+                    }
+                });
+            }
+        },
 
-		createModal: function (element, options) {
-			$(element).modal($.extend({ manager: this }, options));
-		},
+        createModal: function (element, options) {
+            $(element).modal($.extend({ manager: this }, options));
+        },
 
-		appendModal: function (modal) {
-			this.stack.push(modal);
+        appendModal: function (modal) {
+            this.stack.push(modal);
 
-			var that = this;
+            var that = this;
 
-			modal.$element.on('show.modalmanager', targetIsSelf(function (e) {
+            modal.$element.on('show.modalmanager', targetIsSelf(function (e) {
 
-				var showModal = function(){
-					modal.isShown = true;
+                var showModal = function(){
+                    modal.isShown = true;
 
-					var transition = $.support.transition && modal.$element.hasClass('fade');
+                    $('body').css('overflow', 'hidden');
 
-					that.$element
-						.toggleClass('modal-open', that.hasOpenModal())
-						.toggleClass('page-overflow', $(window).height() < that.$element.height());
+                    var transition = $.support.transition && modal.$element.hasClass('fade');
 
-					modal.$parent = modal.$element.parent();
+                    that.$element
+                        .toggleClass('modal-open', that.hasOpenModal())
+                        .toggleClass('page-overflow', $(window).height() < that.$element.height());
 
-					modal.$container = that.createContainer(modal);
+                    modal.$parent = modal.$element.parent();
 
-					modal.$element.appendTo(modal.$container);
+                    modal.$container = that.createContainer(modal);
 
-					that.backdrop(modal, function () {
+                    modal.$element.appendTo(modal.$container);
 
-						modal.$element.show();
+                    that.backdrop(modal, function () {
 
-						if (transition) {       
-							//modal.$element[0].style.display = 'run-in';       
-							modal.$element[0].offsetWidth;
-							//modal.$element.one($.support.transition.end, function () { modal.$element[0].style.display = 'block' });  
-						}
-						
-						modal.layout();
+                        modal.$element.show();
 
-						modal.$element
-							.addClass('in')
-							.attr('aria-hidden', false);
+                        modal.$element
+                            .addClass('in')
+                            .attr('aria-hidden', false);
 
-						var complete = function () {
-							that.setFocus();
-							modal.$element.trigger('shown');
-						};
+                        var complete = function () {
+                            that.setFocus();
+                            modal.$element.trigger('shown');
+                        };
 
-						transition ?
-							modal.$element.one($.support.transition.end, complete) :
-							complete();
-					});
-				};
+                        transition ?
+                            modal.$element.one($.support.transition.end, complete) :
+                            complete();
+                    });
+                };
 
-				modal.options.replace ?
-					that.replace(showModal) :
-					showModal();
-			}));
+                modal.options.replace ?
+                    that.replace(showModal) :
+                    showModal();
 
-			modal.$element.on('hidden.modalmanager', targetIsSelf(function (e) {
+                $('.modal-comments-scroll').height($('.modal-comments').height() - 60);
+            }));
 
-				that.backdrop(modal);
+            modal.$element.on('hidden.modalmanager', targetIsSelf(function (e) {
+                $('body').css('overflow', 'inherit');
 
-				if (modal.$backdrop){
-					$.support.transition && modal.$element.hasClass('fade') ?
-						modal.$backdrop.one($.support.transition.end, function () { that.destroyModal(modal) }) :
-						that.destroyModal(modal);
-				} else {
-					that.destroyModal(modal);
-				}
+                that.backdrop(modal);
 
-			}));
+                if (modal.$backdrop){
+                    $.support.transition && modal.$element.hasClass('fade') ?
+                        modal.$backdrop.one($.support.transition.end, function () { that.destroyModal(modal) }) :
+                        that.destroyModal(modal);
+                } else {
+                    that.destroyModal(modal);
+                }
 
-			modal.$element.on('destroy.modalmanager', targetIsSelf(function (e) {
-				that.removeModal(modal);
-			}));
+            }));
 
-		},
+            modal.$element.on('destroy.modalmanager', targetIsSelf(function (e) {
+                that.removeModal(modal);
+            }));
 
-		destroyModal: function (modal) {
+        },
 
-			modal.destroy();
+        destroyModal: function (modal) {
+            var hasOpenModal = this.hasOpenModal();
 
-			var hasOpenModal = this.hasOpenModal();
+            this.$element.toggleClass('modal-open', hasOpenModal);
 
-			this.$element.toggleClass('modal-open', hasOpenModal);
+            if (!hasOpenModal){
+                this.$element.removeClass('page-overflow');
+            }
+
+            this.removeContainer(modal);
+
+            this.setFocus();
+        },
+
+        hasOpenModal: function () {
+            for (var i = 0; i < this.stack.length; i++){
+                if (this.stack[i].isShown) return true;
+            }
+
+            return false;
+        },
 
-			if (!hasOpenModal){
-				this.$element.removeClass('page-overflow');
-			}
+        setFocus: function () {
+            var topModal;
 
-			this.removeContainer(modal);
+            for (var i = 0; i < this.stack.length; i++){
+                if (this.stack[i].isShown) topModal = this.stack[i];
+            }
 
-			this.setFocus();
-		},
+            if (!topModal) return;
+        },
 
-		hasOpenModal: function () {
-			for (var i = 0; i < this.stack.length; i++){
-				if (this.stack[i].isShown) return true;
-			}
+        removeModal: function (modal) {
+            modal.$element.off('.modalmanager');
+            if (modal.$backdrop) this.removeBackdrop(modal);
+            this.stack.splice(this.getIndexOfModal(modal), 1);
+        },
 
-			return false;
-		},
+        getModalAt: function (index) {
+            return this.stack[index];
+        },
 
-		setFocus: function () {
-			var topModal;
+        getIndexOfModal: function (modal) {
+            for (var i = 0; i < this.stack.length; i++){
+                if (modal === this.stack[i]) return i;
+            }
+        },
 
-			for (var i = 0; i < this.stack.length; i++){
-				if (this.stack[i].isShown) topModal = this.stack[i];
-			}
+        replace: function (callback) {
+            var topModal;
 
-			if (!topModal) return;
+            for (var i = 0; i < this.stack.length; i++){
+                if (this.stack[i].isShown) topModal = this.stack[i];
+            }
 
-			topModal.focus();
+            if (topModal) {
+                this.$backdropHandle = topModal.$backdrop;
+                topModal.$backdrop = null;
 
-		},
+                callback && topModal.$element.one('hidden',
+                    targetIsSelf( $.proxy(callback, this) ));
 
-		removeModal: function (modal) {
-			modal.$element.off('.modalmanager');
-			if (modal.$backdrop) this.removeBackdrop(modal);
-			this.stack.splice(this.getIndexOfModal(modal), 1);
-		},
+                topModal.hide();
+            } else if (callback) {
+                callback();
+            }
+        },
 
-		getModalAt: function (index) {
-			return this.stack[index];
-		},
+        removeBackdrop: function (modal) {
+            modal.$backdrop.remove();
+            modal.$backdrop = null;
+        },
 
-		getIndexOfModal: function (modal) {
-			for (var i = 0; i < this.stack.length; i++){
-				if (modal === this.stack[i]) return i;
-			}
-		},
+        createBackdrop: function (animate) {
+            var $backdrop;
 
-		replace: function (callback) {
-			var topModal;
+            if (!this.$backdropHandle) {
+                $backdrop = $('<div class="modal-backdrop ' + animate + '" />')
+                    .appendTo(this.$element);
+            } else {
+                $backdrop = this.$backdropHandle;
+                $backdrop.off('.modalmanager');
+                this.$backdropHandle = null;
+                this.isLoading && this.removeSpinner();
+            }
 
-			for (var i = 0; i < this.stack.length; i++){
-				if (this.stack[i].isShown) topModal = this.stack[i];
-			}
+            return $backdrop;
+        },
 
-			if (topModal) {
-				this.$backdropHandle = topModal.$backdrop;
-				topModal.$backdrop = null;
+        removeContainer: function (modal) {
+            modal.$container.remove();
+            modal.$container = null;
+        },
 
-				callback && topModal.$element.one('hidden',
-					targetIsSelf( $.proxy(callback, this) ));
+        createContainer: function (modal) {
+            var $container;
 
-				topModal.hide();
-			} else if (callback) {
-				callback();
-			}
-		},
+            $container = $('<div class="modal-scrollable">')
+                .css('z-index', getzIndex( 'modal',
+                    modal ? this.getIndexOfModal(modal) : this.stack.length ))
+                .appendTo(this.$element);
 
-		removeBackdrop: function (modal) {
-			modal.$backdrop.remove();
-			modal.$backdrop = null;
-		},
+            if (modal && modal.options.backdrop != 'static') {
+                $container.on('click.modal', targetIsSelf(function (e) {
+                    modal.hide();
+                }));
+            } else if (modal) {
+                $container.on('click.modal', targetIsSelf(function (e) {
+                    modal.attention();
+                }));
+            }
 
-		createBackdrop: function (animate) {
-			var $backdrop;
+            return $container;
 
-			if (!this.$backdropHandle) {
-				$backdrop = $('<div class="modal-backdrop ' + animate + '" />')
-					.appendTo(this.$element);
-			} else {
-				$backdrop = this.$backdropHandle;
-				$backdrop.off('.modalmanager');
-				this.$backdropHandle = null;
-				this.isLoading && this.removeSpinner();
-			}
+        },
 
-			return $backdrop;
-		},
+        backdrop: function (modal, callback) {
+            var animate = modal.$element.hasClass('fade') ? 'fade' : '',
+                showBackdrop = modal.options.backdrop &&
+                    this.backdropCount < this.options.backdropLimit;
 
-		removeContainer: function (modal) {
-			modal.$container.remove();
-			modal.$container = null;
-		},
+            if (modal.isShown && showBackdrop) {
+                var doAnimate = $.support.transition && animate && !this.$backdropHandle;
 
-		createContainer: function (modal) {
-			var $container;
+                modal.$backdrop = this.createBackdrop(animate);
 
-			$container = $('<div class="modal-scrollable">')
-				.css('z-index', getzIndex( 'modal',
-					modal ? this.getIndexOfModal(modal) : this.stack.length ))
-				.appendTo(this.$element);
+                modal.$backdrop.css('z-index', getzIndex( 'backdrop', this.getIndexOfModal(modal) ));
 
-			if (modal && modal.options.backdrop != 'static') {
-				$container.on('click.modal', targetIsSelf(function (e) {
-					modal.hide();
-				}));
-			} else if (modal) {
-				$container.on('click.modal', targetIsSelf(function (e) {
-					modal.attention();
-				}));
-			}
+                if (doAnimate) modal.$backdrop[0].offsetWidth; // force reflow
 
-			return $container;
+                modal.$backdrop.addClass('in');
 
-		},
+                this.backdropCount += 1;
 
-		backdrop: function (modal, callback) {
-			var animate = modal.$element.hasClass('fade') ? 'fade' : '',
-				showBackdrop = modal.options.backdrop &&
-					this.backdropCount < this.options.backdropLimit;
+                doAnimate ?
+                    modal.$backdrop.one($.support.transition.end, callback) :
+                    callback();
 
-			if (modal.isShown && showBackdrop) {
-				var doAnimate = $.support.transition && animate && !this.$backdropHandle;
+            } else if (!modal.isShown && modal.$backdrop) {
+                modal.$backdrop.removeClass('in');
 
-				modal.$backdrop = this.createBackdrop(animate);
+                this.backdropCount -= 1;
 
-				modal.$backdrop.css('z-index', getzIndex( 'backdrop', this.getIndexOfModal(modal) ));
+                var that = this;
 
-				if (doAnimate) modal.$backdrop[0].offsetWidth; // force reflow
+                $.support.transition && modal.$element.hasClass('fade')?
+                    modal.$backdrop.one($.support.transition.end, function () { that.removeBackdrop(modal) }) :
+                    that.removeBackdrop(modal);
 
-				modal.$backdrop.addClass('in');
+            } else if (callback) {
+                callback();
+            }
+        },
 
-				this.backdropCount += 1;
+        removeSpinner: function(){
+            this.$spinner && this.$spinner.remove();
+            this.$spinner = null;
+            this.isLoading = false;
+        },
 
-				doAnimate ?
-					modal.$backdrop.one($.support.transition.end, callback) :
-					callback();
+        removeLoading: function () {
+            this.$backdropHandle && this.$backdropHandle.remove();
+            this.$backdropHandle = null;
+            this.removeSpinner();
+        },
 
-			} else if (!modal.isShown && modal.$backdrop) {
-				modal.$backdrop.removeClass('in');
+        loading: function (callback) {
+            callback = callback || function () { };
 
-				this.backdropCount -= 1;
+            this.$element
+                .toggleClass('modal-open', !this.isLoading || this.hasOpenModal())
+                .toggleClass('page-overflow', $(window).height() < this.$element.height());
 
-				var that = this;
+            if (!this.isLoading) {
 
-				$.support.transition && modal.$element.hasClass('fade')?
-					modal.$backdrop.one($.support.transition.end, function () { that.removeBackdrop(modal) }) :
-					that.removeBackdrop(modal);
+                this.$backdropHandle = this.createBackdrop('fade');
 
-			} else if (callback) {
-				callback();
-			}
-		},
+                this.$backdropHandle[0].offsetWidth; // force reflow
 
-		removeSpinner: function(){
-			this.$spinner && this.$spinner.remove();
-			this.$spinner = null;
-			this.isLoading = false;
-		},
+                this.$backdropHandle
+                    .css('z-index', getzIndex('backdrop', this.stack.length))
+                    .addClass('in');
 
-		removeLoading: function () {
-			this.$backdropHandle && this.$backdropHandle.remove();
-			this.$backdropHandle = null;
-			this.removeSpinner();
-		},
+                var $spinner = $(this.options.spinner)
+                    .css('z-index', getzIndex('modal', this.stack.length))
+                    .appendTo(this.$element)
+                    .addClass('in');
 
-		loading: function (callback) {
-			callback = callback || function () { };
+                this.$spinner = $(this.createContainer())
+                    .append($spinner)
+                    .on('click.modalmanager', $.proxy(this.loading, this));
 
-			this.$element
-				.toggleClass('modal-open', !this.isLoading || this.hasOpenModal())
-				.toggleClass('page-overflow', $(window).height() < this.$element.height());
+                this.isLoading = true;
 
-			if (!this.isLoading) {
+                $.support.transition ?
+                    this.$backdropHandle.one($.support.transition.end, callback) :
+                    callback();
 
-				this.$backdropHandle = this.createBackdrop('fade');
+            } else if (this.isLoading && this.$backdropHandle) {
+                this.$backdropHandle.removeClass('in');
 
-				this.$backdropHandle[0].offsetWidth; // force reflow
+                var that = this;
+                $.support.transition ?
+                    this.$backdropHandle.one($.support.transition.end, function () { that.removeLoading() }) :
+                    that.removeLoading();
 
-				this.$backdropHandle
-					.css('z-index', getzIndex('backdrop', this.stack.length))
-					.addClass('in');
+            } else if (callback) {
+                callback(this.isLoading);
+            }
+        }
+    };
 
-				var $spinner = $(this.options.spinner)
-					.css('z-index', getzIndex('modal', this.stack.length))
-					.appendTo(this.$element)
-					.addClass('in');
+    /* PRIVATE METHODS
+    * ======================= */
 
-				this.$spinner = $(this.createContainer())
-					.append($spinner)
-					.on('click.modalmanager', $.proxy(this.loading, this));
+    // computes and caches the zindexes
+    var getzIndex = (function () {
+        var zIndexFactor,
+            baseIndex = {};
 
-				this.isLoading = true;
+        return function (type, pos) {
 
-				$.support.transition ?
-					this.$backdropHandle.one($.support.transition.end, callback) :
-					callback();
+            if (typeof zIndexFactor === 'undefined'){
+                var $baseModal = $('<div class="modal hide" />').appendTo('body'),
+                    $baseBackdrop = $('<div class="modal-backdrop hide" />').appendTo('body');
 
-			} else if (this.isLoading && this.$backdropHandle) {
-				this.$backdropHandle.removeClass('in');
+                baseIndex['modal'] = +$baseModal.css('z-index');
+                baseIndex['backdrop'] = +$baseBackdrop.css('z-index');
+                zIndexFactor = baseIndex['modal'] - baseIndex['backdrop'];
 
-				var that = this;
-				$.support.transition ?
-					this.$backdropHandle.one($.support.transition.end, function () { that.removeLoading() }) :
-					that.removeLoading();
+                $baseModal.remove();
+                $baseBackdrop.remove();
+                $baseBackdrop = $baseModal = null;
+            }
 
-			} else if (callback) {
-				callback(this.isLoading);
-			}
-		}
-	};
+            return baseIndex[type] + (zIndexFactor * pos);
 
-	/* PRIVATE METHODS
-	* ======================= */
+        }
+    }());
 
-	// computes and caches the zindexes
-	var getzIndex = (function () {
-		var zIndexFactor,
-			baseIndex = {};
+    // make sure the event target is the modal itself in order to prevent
+    // other components such as tabsfrom triggering the modal manager.
+    // if Boostsrap namespaced events, this would not be needed.
+    function targetIsSelf(callback){
+        return function (e) {
+            if (this === e.target){
+                return callback.apply(this, arguments);
+            }
+        }
+    }
 
-		return function (type, pos) {
 
-			if (typeof zIndexFactor === 'undefined'){
-				var $baseModal = $('<div class="modal hide" />').appendTo('body'),
-					$baseBackdrop = $('<div class="modal-backdrop hide" />').appendTo('body');
+    /* MODAL MANAGER PLUGIN DEFINITION
+    * ======================= */
 
-				baseIndex['modal'] = +$baseModal.css('z-index');
-				baseIndex['backdrop'] = +$baseBackdrop.css('z-index');
-				zIndexFactor = baseIndex['modal'] - baseIndex['backdrop'];
+    $.fn.modalmanager = function (option, args) {
+        return this.each(function () {
+            var $this = $(this),
+                data = $this.data('modalmanager');
 
-				$baseModal.remove();
-				$baseBackdrop.remove();
-				$baseBackdrop = $baseModal = null;
-			}
+            if (!data) $this.data('modalmanager', (data = new ModalManager(this, option)));
+            if (typeof option === 'string') data[option].apply(data, [].concat(args))
+        })
+    };
 
-			return baseIndex[type] + (zIndexFactor * pos);
+    $.fn.modalmanager.defaults = {
+        backdropLimit: 999,
+        resize: true,
+        spinner: '<div class="loading-spinner fade" style="width: 200px; margin-left: -100px;"><div class="progress progress-striped active"><div class="bar" style="width: 100%;"></div></div></div>'
+    };
 
-		}
-	}());
-
-	// make sure the event target is the modal itself in order to prevent
-	// other components such as tabsfrom triggering the modal manager.
-	// if Boostsrap namespaced events, this would not be needed.
-	function targetIsSelf(callback){
-		return function (e) {
-			if (this === e.target){
-				return callback.apply(this, arguments);
-			}
-		}
-	}
-
-
-	/* MODAL MANAGER PLUGIN DEFINITION
-	* ======================= */
-
-	$.fn.modalmanager = function (option, args) {
-		return this.each(function () {
-			var $this = $(this),
-				data = $this.data('modalmanager');
-
-			if (!data) $this.data('modalmanager', (data = new ModalManager(this, option)));
-			if (typeof option === 'string') data[option].apply(data, [].concat(args))
-		})
-	};
-
-	$.fn.modalmanager.defaults = {
-		backdropLimit: 999,
-		resize: true,
-		spinner: '<div class="loading-spinner fade" style="width: 200px; margin-left: -100px;"><div class="progress progress-striped active"><div class="bar" style="width: 100%;"></div></div></div>'
-	};
-
-	$.fn.modalmanager.Constructor = ModalManager
+    $.fn.modalmanager.Constructor = ModalManager
 
 }(jQuery);
+
+});
